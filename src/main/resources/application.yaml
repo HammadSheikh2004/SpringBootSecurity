@@ -1,0 +1,35 @@
+spring:
+  application:
+    name: SpringBootSecurity
+
+# Database Configurations
+
+  datasource:
+    url: ${DATABASE_URL}
+    username: ${DATABASE_NAME}
+    password: ${DATABASE_PASSWORD}
+    driver-class-name: org.postgresql.Driver
+
+#ORM Configurations
+
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: true
+  properties:
+    hibernate:
+      formate_sql: true
+
+
+#JWT Configurations
+
+  security:
+    jwt:
+    secret: ${JWT_SECRET_KEY}
+    jwt_issure: ${JWT_ISSUER}
+    jwt_access_ttl_second: ${JWT_ACCESS_TTL_SECOND}
+    jwt_refresh_ttl_second: ${JWT_REFRESH_TTL_SECOND}
+    jwt_refresh_cookie_name: ${JWT_REFRESH_COOKIE_NAME}
+    cookie_secure: ${JWT_COOKIE_NAME}
+    cookie_http_only:  ${JWT_COOKIE_HTTP_ONLY}
+    cookiie_same_site: $JWT_COOKIE_SAME_SITE }
