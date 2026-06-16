@@ -10,12 +10,18 @@ import com.mhis.springbootsecurity.entity.Token;
 import com.mhis.springbootsecurity.repository.ITokenRepository;
 import com.mhis.springbootsecurity.repository.IUserRepository;
 import com.mhis.springbootsecurity.validation.PasswordValidator;
+import io.jsonwebtoken.Claims;
+import io.jsonwebtoken.Jwts;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.ResponseCookie;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
+import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.UUID;
 
 
 @Service
@@ -29,6 +35,10 @@ public class AuthService {
     private JwtService jwtService;
     @Autowired
     private ITokenRepository tokenRepository;
+    private String Secret;
+    public AuthService(@Value("${JWT_SECRET_KEY}") String secret){
+        this.Secret = secret;
+    }
 
 
     public UserDTO userRegistered(UserDTO userDTO) {
@@ -124,6 +134,32 @@ public class AuthService {
                 .build();
     }
 
+    public UserDTO userById(UUID userId){
+        Registration findUser =
+                userRepo.findById(userId).orElseThrow(()->new RuntimeException(
+                        "User not Find!"));
+        return UserDTO.builder()
+                .registrationId(findUser.getRegistrationId())
+                .userName(findUser.getUserName())
+                .email(findUser.getEmail())
+                .role(findUser.getRole())
+                .password(findUser.getPassword())
+                .confirmPassword(findUser.getConfirmPassword())
+                .createdAt(findUser.getCreatedAt())
+                .updatedAt(findUser.getUpdatedAt()).build();
+    }
+
+    public ResponseCookie getRefreshCookie(String refreshToken) {
+
+        return ResponseCookie.from("refreshCookie", refreshToken)
+                .httpOnly(true)
+                .secure(false) // dev mode
+                .sameSite("Lax")
+                .path("/")
+                .maxAge(Duration.ofDays(7))
+                .build();
+    }
+
     public AuthResponse refreshToken(String refreshToken){
 
         Token tokenEntity =
@@ -154,6 +190,29 @@ public class AuthService {
                 .userName(user.getUserName())
                 .refreshToken(refreshToken)
                 .build();
+    }
+
+    public Registration getUserFromToken(String token){
+
+        System.out.println("TOKEN: " + token);
+
+        Claims claims =
+                Jwts.parser()
+                        .setSigningKey(Secret.getBytes())
+                        .build()
+                        .parseClaimsJws(token)
+                        .getBody();
+
+        System.out.println("CLAIMS: " + claims);
+
+        UUID registrationId =
+                UUID.fromString(
+                        claims.get("RegistrationId", String.class)
+                );
+
+        System.out.println("REG ID: " + registrationId);
+
+        return userRepo.findByRegistrationId(registrationId);
     }
 
     public void logout(String refreshToken) {

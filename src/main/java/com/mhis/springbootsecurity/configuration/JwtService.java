@@ -29,7 +29,7 @@ public class JwtService {
         return Jwts.builder().subject(email)
                 .claim("Role", role)
                 .claim("RegistrationId", registrationId)
-                .issuedAt(new Date()).expiration(new Date(System.currentTimeMillis() + 1000 * 60 * 15))
+                .issuedAt(new Date()).expiration(new Date(System.currentTimeMillis() + 1000 * 60 * 5))
                 .signWith(getSignKey())
                 .compact();
     }
