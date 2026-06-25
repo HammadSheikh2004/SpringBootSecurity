@@ -3,11 +3,14 @@ package com.mhis.springbootsecurity.services;
 import com.mhis.springbootsecurity.DTOs.AuthResponse;
 import com.mhis.springbootsecurity.DTOs.LoginDTO;
 import com.mhis.springbootsecurity.DTOs.UserDTO;
+import com.mhis.springbootsecurity.DTOs.UserProfileDTO;
 import com.mhis.springbootsecurity.configuration.JwtService;
 import com.mhis.springbootsecurity.entity.Registration;
 import com.mhis.springbootsecurity.entity.Roles;
 import com.mhis.springbootsecurity.entity.Token;
+import com.mhis.springbootsecurity.entity.UserProfile;
 import com.mhis.springbootsecurity.repository.ITokenRepository;
+import com.mhis.springbootsecurity.repository.IUserProfileRepository;
 import com.mhis.springbootsecurity.repository.IUserRepository;
 import com.mhis.springbootsecurity.validation.PasswordValidator;
 import io.jsonwebtoken.Claims;
@@ -15,9 +18,16 @@ import io.jsonwebtoken.Jwts;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseCookie;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.web.multipart.MultipartFile;
 
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -35,6 +45,8 @@ public class AuthService {
     private JwtService jwtService;
     @Autowired
     private ITokenRepository tokenRepository;
+    @Autowired
+    private IUserProfileRepository userProfileRepository;
     private String Secret;
     public AuthService(@Value("${JWT_SECRET_KEY}") String secret){
         this.Secret = secret;
@@ -75,9 +87,7 @@ public class AuthService {
                 .role(Roles.USER)
                 .createdAt(LocalDateTime.now())
                 .updatedAt(LocalDateTime.now()).build();
-
         Registration savedUsers = userRepo.save(registration);
-
         return UserDTO.builder()
                 .registrationId(savedUsers.getRegistrationId())
                 .userName(savedUsers.getUserName())
@@ -170,21 +180,17 @@ public class AuthService {
         if(tokenEntity.isRevoke()){
             throw new RuntimeException("Token revoked");
         }
-
         if(tokenEntity.getExpiryDate().isBefore(LocalDateTime.now())){
             throw new RuntimeException("Token expired");
         }
-
         Registration user =
                 userRepo.findById(tokenEntity.getUserId())
                         .orElseThrow();
-
         String newAccessToken =
                 jwtService.generateToken(
                         user.getEmail(),
                         user.getRole(),
                         user.getRegistrationId());
-
         return AuthResponse.builder()
                 .token(newAccessToken)
                 .userName(user.getUserName())
@@ -193,25 +199,19 @@ public class AuthService {
     }
 
     public Registration getUserFromToken(String token){
-
         System.out.println("TOKEN: " + token);
-
         Claims claims =
                 Jwts.parser()
                         .setSigningKey(Secret.getBytes())
                         .build()
                         .parseClaimsJws(token)
                         .getBody();
-
         System.out.println("CLAIMS: " + claims);
-
         UUID registrationId =
                 UUID.fromString(
                         claims.get("RegistrationId", String.class)
                 );
-
         System.out.println("REG ID: " + registrationId);
-
         return userRepo.findByRegistrationId(registrationId);
     }
 
@@ -225,6 +225,33 @@ public class AuthService {
         tokenRepository.save(tokenEntity);
     }
 
+    public UserProfile userProfile(UserProfileDTO dto, UUID registrationId) throws IOException {
+
+        Registration registration = userRepo.findById(registrationId)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+
+        UserProfile profile = userProfileRepository
+                .findByUserRegistration_RegistrationId(registrationId)
+                .orElse(new UserProfile());
+
+        profile.setFirstName(dto.getFirstName());
+        profile.setLastName(dto.getLastName());
+        profile.setUserRegistration(registration);
+
+        MultipartFile image = dto.getUserImage();
+        if (image != null && !image.isEmpty()) {
+            String uploads = "uploads/profile";
+            Files.createDirectories(Paths.get(uploads));
+
+            String fileName = UUID.randomUUID() + "_" + image.getOriginalFilename();
+            Path path = Paths.get(uploads, fileName);
+
+            Files.write(path, image.getBytes());
+
+            profile.setUserImage(fileName);
+        }
+        return userProfileRepository.save(profile);
+    }
 
 }
 

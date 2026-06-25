@@ -1,22 +1,20 @@
 package com.mhis.springbootsecurity.controller;
 
-import com.mhis.springbootsecurity.DTOs.AuthResponse;
-import com.mhis.springbootsecurity.DTOs.LoginDTO;
-import com.mhis.springbootsecurity.DTOs.RefreshTokenRequest;
-import com.mhis.springbootsecurity.DTOs.UserDTO;
+import com.mhis.springbootsecurity.DTOs.*;
+import com.mhis.springbootsecurity.entity.UserProfile;
 import com.mhis.springbootsecurity.helper.ApiResponse;
 import com.mhis.springbootsecurity.services.AuthService;
 import com.mhis.springbootsecurity.entity.Registration;
 import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseCookie;
-import org.springframework.http.ResponseEntity;
+import org.springframework.http.*;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
+import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
@@ -110,9 +108,18 @@ public class AuthController {
     }
 
     @PostMapping("/logout")
-    public ResponseEntity<ApiResponse<String>> logout(@RequestBody RefreshTokenRequest request) {
+    public ResponseEntity<ApiResponse<String>> logout(
+            @CookieValue("refreshCookie") String refreshToken,
+            HttpServletResponse response) {
 
-        authService.logout(request.getRefreshToken());
+        authService.logout(refreshToken);
+
+        Cookie cookie = new Cookie("refreshCookie", "");
+        cookie.setHttpOnly(true);
+        cookie.setPath("/");
+        cookie.setMaxAge(0);
+
+        response.addCookie(cookie);
 
         return ResponseEntity.ok(
                 new ApiResponse<>(true, "Logout successful", null)
@@ -125,8 +132,19 @@ public class AuthController {
         UserDTO user = authService.userById(id);
 
         return ResponseEntity.ok(
-                new ApiResponse<>(true, "Logout successful", user)
+                new ApiResponse<>(true, "User Find", user)
         );
     }
 
+    @PutMapping(value = "/update", consumes =
+            MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<?> update(
+            @ModelAttribute UserProfileDTO dto,
+            @RequestParam("id") UUID id
+    ) throws IOException {
+
+        return ResponseEntity.ok(
+                authService.userProfile(dto, id)
+        );
+    }
 }
